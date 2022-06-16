@@ -6,9 +6,13 @@ from aiogram import (
 )
 
 import config
+from quiz import Quiz
 
 bot = Bot(token=config.TOKEN)
 dp = Dispatcher(bot)
+
+quiz_db = {} # quiz info
+quiz_owners = {} # quiz owners info
 
 @dp.message_handler(commands=['start'])
 async def cmd_start(message: types.Message) -> None:
