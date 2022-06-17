@@ -18,14 +18,47 @@ quiz_owners = {} # quiz owners info
 @dp.message_handler(commands=['start'])
 async def cmd_start(message: types.Message) -> None:
     """Start command handler"""
-    poll_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    poll_keyboard.add(types.KeyboardButton(
-        text='Создать тест',
-        request_poll=types.KeyboardButtonPollType(type=types.PollType.QUIZ)
-    ))
-    poll_keyboard.add(types.KeyboardButton(text='Отмена'))
-    await message.answer('Нажмите на кнопку и создайте тест!',
-                        reply_markup=poll_keyboard)
+    if message.chat.type == types.ChatType.PRIVATE:
+        poll_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        poll_keyboard.add(types.KeyboardButton(
+            text='Создать тест',
+            request_poll=types.KeyboardButtonPollType(type=types.PollType.QUIZ)
+        ))
+        poll_keyboard.add(types.KeyboardButton(text='Отмена'))
+        await message.answer('Нажмите на кнопку и создайте тест!',
+                            reply_markup=poll_keyboard)
+    else:
+        words = message.text.split()
+        if len(words) == 1:
+            bot_info = await bot.get_me()
+            keyboard = types.InlineKeyboardMarkup()
+            move_to_pm_button = types.InlineKeyboardButton(
+                text="Перейти к боту",
+                url=f't.me/{bot_info.username})?start=anything'
+            )
+            keyboard.add(move_to_pm_button)
+            await message.reply('Не выбран тест. Создайте тест в чате с ботом',
+                reply_markup=keyboard)
+        else:
+            quiz_owner = quiz_owners(words[1])
+            if not quiz_owner:
+                await message.reply('Неправильный тест. Попробуйте создать другой')
+                return
+            for quiz in quiz_db[quiz_owner]:
+                if quiz.quiz_id == words[1]:
+                    msg = await bot.send_poll(
+                        chat_id=message.chat_id,
+                        question=quiz.question,
+                        is_anonymous=False,
+                        options=quiz.options,
+                        type='quiz',
+                        correct_option_id=quiz.correct_option_id
+                    )
+                    quiz_owners[msg.poll.id] = quiz_owner
+                    del quiz_owners[words[1]]
+                    quiz.quiz_id = msg.poll.id
+                    quiz.chat_id = msg.chat.id
+                    quiz.message_id = msg.message_id
 
 @dp.message_handler(lambda message: message.text == 'Отмена')
 async def action_cancel(message: types.Message) -> None:
@@ -77,7 +110,7 @@ async def inline_query(query: types.InlineQuery) -> None:
                 id=quiz.quiz_id,
                 title=quiz.question,
                 input_message_content=types.InputTextMessageContent(
-                    message_text='Нажмите кнопки ниже для отправки теста в группу'
+                    message_text='Отправьте кнопку ниже для отправки теста в группу'
                 ),
                 reply_markup=keyboard
             ))
