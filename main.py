@@ -4,6 +4,7 @@ from aiogram import (
     executor,
     types,
 )
+from aiogram.utils import deep_linking
 
 import config
 from quiz import Quiz
@@ -59,6 +60,29 @@ async def msg_with_poll(message: types.Message) -> None:
         f'Тест сохранен. Общее количество тестов: {len(quiz_db[user_id])}'
     )
 
+@dp.inline_handler()
+async def inline_query(query: types.InlineQuery) -> None:
+    """Inline query handler"""
+    results = []
+    user_quizes = quiz_db.get(query.from_user.id)
+    if user_quizes:
+        for quiz in user_quizes:
+            keyboard = types.InlineKeyboardMarkup()
+            start_quiz_button = types.InlineKeyboardButton(
+                text='Отправить в группу',
+                url=await deep_linking.get_startgroup_link(quiz.quiz_id)
+            )
+            keyboard.add(start_quiz_button)
+            results.append(types.InlineQueryResultArticle(
+                id=quiz.quiz_id,
+                title=quiz.question,
+                input_message_content=types.InputTextMessageContent(
+                    message_text='Нажмите кнопки ниже для отправки теста в группу'
+                ),
+                reply_markup=keyboard
+            ))
+    await query.answer(switch_pm_text='Создать тест', switch_pm_parameter='-',
+        results=results, cache_time=120, is_personal=True)
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
